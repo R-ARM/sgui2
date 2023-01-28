@@ -1,4 +1,4 @@
-use sgui2::builders::{GuiBuilder, WidgetData};
+use sgui2::builders::{GuiBuilder, TabBuilder, WidgetData};
 use sgui2::{GuiEvent, WidgetState};
 
 fn widget_dbg(wdg: &mut WidgetState) {
@@ -11,23 +11,19 @@ fn widget_dbg(wdg: &mut WidgetState) {
 }
 
 fn main() {
-    let mut gui = GuiBuilder::new("Test program")
-        .tab("A tab")
-            .widget(WidgetData::btn("Example button", widget_dbg))
-            .done()
-        .tab("Second tab")
+    let mut gui_builder = GuiBuilder::new("Test program");
+    let mut gui = gui_builder.tab(TabBuilder::new("A tab")
+            .widget(WidgetData::btn("Example button", widget_dbg)))
+        .tab(TabBuilder::new("Second tab")
             .widget(WidgetData::btn("Button with function", widget_dbg))
             .widget(WidgetData::btn("Button with closure", |b| println!("closure {:#?}", b)))
             .widget(WidgetData::btn("Button with an empty closure", |_| {}))
             .widget(WidgetData::toggle("A toggle with callback", |b| println!("{:#?}", b), true))
-            .widget(WidgetData::slider("I'm a slider!", widget_dbg, 128))
-            .done()
+            .widget(WidgetData::slider("I'm a slider!", widget_dbg, 128)))
         .tab_separator()
-        .tab("Separated tab")
-            .widget(WidgetData::btn("A button with callback", |b| println!("{:#?}", b)))
-            .done()
-        .tab("Tab with a very long name to show off scrolling")
-            .done()
+        .tab(TabBuilder::new("Separated tab")
+            .widget(WidgetData::btn("A button with callback", |b| println!("{:#?}", b))))
+        .tab(&mut TabBuilder::new("Tab with a very long name to show off scrolling"))
         .build();
 
     loop {

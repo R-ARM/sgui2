@@ -7,7 +7,7 @@ use sdl2::{
     },
     video::WindowContext,
 };
-use std::time::Instant;
+use std::{mem, time::Instant};
 
 pub struct GuiBuilder {
     name: String,
@@ -21,18 +21,15 @@ impl GuiBuilder {
             tabs: Vec::new(),
         }
     }
-    pub fn tab(self, name: impl ToString) -> TabBuilder {
-        TabBuilder {
-            name: name.to_string(),
-            widgets: Vec::new(),
-            gui_builder: Some(self),
-        }
+    pub fn tab(&mut self, tab: &mut TabBuilder) -> &mut Self {
+        self.tabs.push(Some(mem::take(tab)));
+        self
     }
-    pub fn tab_separator(mut self) -> Self {
+    pub fn tab_separator(&mut self) -> &mut Self {
         self.tabs.push(None);
         self
     }
-    pub fn build(self) -> Gui {
+    pub fn build(&mut self) -> Gui {
         // make sure we run on wayland if we can
         sdl2::hint::set("SDL_VIDEODRIVER", "wayland,x11,kmsdrm");
         // sdl init
@@ -59,7 +56,7 @@ impl GuiBuilder {
         let font = ttf.load_font(Theme::font(), fontsize).expect("Failed to load font");
         
         let mut built_tabs = Vec::new();
-        for mut pre_tab_maybe in self.tabs.into_iter() {
+        for pre_tab_maybe in self.tabs.iter_mut() {
             if let Some(pre_tab) = pre_tab_maybe.take() {
                 built_tabs.push(Some(pre_tab.build(&font, &texture_creator)));
             } else {
@@ -89,21 +86,22 @@ fn draw_text(input: &str, font: &Font, texture_creator: &TextureCreator<WindowCo
     texture
 }
 
+#[derive(Default)]
 pub struct TabBuilder {
     name: String,
     widgets: Vec<WidgetData>,
-    gui_builder: Option<GuiBuilder>,
 }
 
 impl TabBuilder {
-    pub fn widget(mut self, data: WidgetData) -> Self {
+    pub fn new(name: impl ToString) -> Self {
+        TabBuilder {
+            name: name.to_string(),
+            widgets: Vec::new(),
+        }
+    }
+    pub fn widget(&mut self, data: WidgetData) -> &mut Self {
         self.widgets.push(data);
         self
-    }
-    pub fn done(mut self) -> GuiBuilder {
-        let mut ret = self.gui_builder.take().unwrap();
-        ret.tabs.push(Some(self));
-        ret
     }
     fn build(self, font: &Font, texture_creator: &TextureCreator<WindowContext>) -> Tab {
         let text = draw_text(&self.name, font, texture_creator);
