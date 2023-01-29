@@ -8,16 +8,8 @@ pub struct Theme {
     bg_tabs: (u8, u8, u8),
     bg_widgets: (u8, u8, u8),
     fg_widgets: (u8, u8, u8),
-    selection_style: SelectionStyle,
     padding: u8,
     idle_timeout: Duration,
-}
-
-#[derive(Debug)]
-pub enum SelectionStyle {
-    Outline(u8, u8, u8),
-    BackgroundDiff,
-    TextHighlight(u8, u8, u8),
 }
 
 impl Theme {
@@ -32,9 +24,6 @@ impl Theme {
     }
     pub fn fg_widgets() -> (u8, u8, u8) {
         (250, 250, 250)
-    }
-    pub fn selection_style() -> SelectionStyle {
-        SelectionStyle::Outline(200, 200, 200)
     }
     pub fn padding() -> u8 {
         20

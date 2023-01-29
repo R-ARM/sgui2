@@ -1,4 +1,4 @@
-use crate::{Gui, WidgetState, Widget, Tab, theme::Theme, Focus};
+use crate::{Gui, WidgetState, Widget, Tab, Focus, SelectionWindow, theme::Theme};
 use sdl2::{
     ttf::{self, Font},
     render::{
@@ -76,6 +76,7 @@ impl GuiBuilder {
             focus: Focus::TabBar,
             last_interaction: Instant::now(),
             tab_scroll: 0,
+            selection: SelectionWindow::new((255, 255, 255)),
         }
     }
 }

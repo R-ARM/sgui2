@@ -1,7 +1,7 @@
 pub mod builders;
 mod theme;
 
-use theme::{Theme, SelectionStyle};
+use theme::Theme;
 use derivative::Derivative;
 use sdl2::{
     render::{
@@ -13,6 +13,7 @@ use sdl2::{
     event::{Event, WindowEvent},
     keyboard::Keycode,
 };
+use num::integer::div_ceil;
 use std::time::{
     Instant,
 };
@@ -38,6 +39,43 @@ pub struct Gui {
     focus: Focus,
     last_interaction: Instant,
     tab_scroll: u8,
+    selection: SelectionWindow,
+}
+
+#[derive(Debug)]
+struct SelectionWindow {
+    rect: Rect,
+    desired: Rect,
+    colors: (u8, u8, u8),
+}
+
+impl SelectionWindow {
+    fn move_to(&mut self, location: Rect) {
+        self.desired = location;
+    }
+    fn draw(&self, canvas: &mut render::Canvas<video::Window>) {
+        canvas.set_draw_color(self.colors);
+        canvas.draw_rect(self.rect).unwrap();
+    }
+    fn tick(&mut self) {
+        if self.rect != self.desired {
+            let x = self.rect.x() + div_ceil(self.desired.x() as i32 - self.rect.x() as i32, 4);
+            let y = self.rect.y() + div_ceil(self.desired.y() as i32 - self.rect.y() as i32, 4);
+            let w = self.rect.width() as i32 + div_ceil(self.desired.width() as i32 - self.rect.width() as i32, 4);
+            let h = self.rect.height() as i32 + div_ceil(self.desired.height() as i32 - self.rect.height() as i32, 4);
+            self.rect.set_x(x);
+            self.rect.set_y(y);
+            self.rect.set_width(w.try_into().unwrap_or(1));
+            self.rect.set_height(h.try_into().unwrap_or(1));
+        }
+    }
+    fn new(rgb: (u8, u8, u8)) -> Self {
+        Self {
+            rect: Rect::new(0, 0, 1, 1),
+            desired: Rect::new(0, 0, 1, 1),
+            colors: rgb,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -212,16 +250,11 @@ impl Gui {
                             let scroll = (self.tab_scroll.clamp(0, 128) as f32)/128.0 * scroll_max as f32;
                             out_rect.set_x(pad + (-1 * scroll as i32));
                         }
-                        match Theme::selection_style() {
-                            SelectionStyle::Outline(r, g, b) => {
-                                let w = left.width() - pad as u32;
-                                let h = q.height as u32 + pad as u32;
-                                self.canvas.set_draw_color((r, g, b));
-                                self.canvas.draw_rect(Rect::new(pad/2, y_pos - pad/2, w, h))
-                                    .expect("Failed to draw selection outline");
-                            }
-                            _ => todo!(),
-                        }
+                        let w = left.width() - pad as u32;
+                        let h = q.height as u32 + pad as u32;
+                        let x = left.x() + (pad/2);
+                        let y = left.y() + (y_pos - pad/2);
+                        self.selection.move_to(Rect::new(x, y, w, h));
                     }
                     self.canvas.copy(&tab.text, None, out_rect)
                         .expect("Failed to draw texture of a widget");
@@ -253,17 +286,12 @@ impl Gui {
                 self.canvas.set_viewport(old_viewport);
 
                 if i == self.current_widget && self.focus != Focus::TabBar {
-                    match Theme::selection_style() {
-                        SelectionStyle::Outline(r, g, b) => {
-                            let outline = Rect::new(0, y_pos, right.width(), widget.height());
-                            self.canvas.set_draw_color((r, g, b));
-                            self.canvas.draw_rect(outline).unwrap();
-                            self.canvas.set_draw_color(Theme::fg_widgets());
-                        },
-                        _ => todo!(),
-                    }
+                    let x = offset;
+                    let y = right.y() + y_pos - pad;
+                    let w = right.width() - 1;
+                    let h = widget.height() + 2*pad as u32;
+                    self.selection.move_to(Rect::new(x, y, w, h));
                 }
-
 
                 y_pos += widget.height() as i32;
                 y_pos += pad as i32;
@@ -271,6 +299,11 @@ impl Gui {
             self.canvas.set_draw_color(Theme::bg_widgets());
         }
 
+        self.canvas.set_viewport(None);
+        self.selection.tick();
+        self.selection.draw(&mut self.canvas);
+
+        self.canvas.set_draw_color(Theme::bg_widgets());
         self.canvas.present();
         None
     }
