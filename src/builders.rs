@@ -144,7 +144,7 @@ impl WidgetData {
         Self {
             name: name.to_string(),
             callback: Some(Box::new(cb)),
-            w_type: WidgetState::Slider(state),
+            w_type: WidgetState::Slider(state, state),
         }
     }
     fn draw(self, font: &Font, texture_creator: &TextureCreator<WindowContext>) -> Widget {

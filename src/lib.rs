@@ -378,7 +378,10 @@ impl Widget {
                 canvas.set_draw_color((old.r, old.g, old.b));
                 canvas.draw_rect(textbox_rect).expect("Failed to draw toggle widget");
             },
-            WidgetState::Slider(state) => {
+            WidgetState::Slider(state, ref mut display_state) => {
+                if *display_state != state {
+                    *display_state = (*display_state as i16).saturating_add(div_ceil(state as i16 - *display_state as i16, 4)).try_into().unwrap();
+                }
                 // try not overlapping text
                 let whole_width = if query.width > bounds.width()/2 {
                     bounds.width() - query.width - margin*4
@@ -386,7 +389,7 @@ impl Widget {
                     bounds.width()/2 - margin*4
                 };
                 let x_pos = bounds.width() - whole_width - margin*2;
-                let state_width = state as f32 / u8::MAX as f32 * whole_width as f32;
+                let state_width = *display_state as f32 / u8::MAX as f32 * whole_width as f32;
 
                 let rect = Rect::new(x_pos as i32, margin as i32, whole_width, box_size);
                 let state_rect = Rect::new(x_pos as i32, margin as i32, state_width as u32, box_size);
@@ -400,7 +403,7 @@ impl Widget {
     fn grabs_input(&self) -> bool {
         match self.state {
             WidgetState::Button | WidgetState::Toggle(..) => false,
-            WidgetState::Slider(_) => true,
+            WidgetState::Slider(..) => true,
         }
     }
     fn process_action(&mut self, code: &ActionKey) {
@@ -417,7 +420,7 @@ impl Widget {
                     fire_callback = true;
                 }
             },
-            WidgetState::Slider(ref mut state) => {
+            WidgetState::Slider(ref mut state, ..) => {
                 match code {
                     ActionKey::Left => {
                         *state = state.saturating_sub(12);
@@ -447,5 +450,5 @@ impl Widget {
 pub enum WidgetState {
     Button,
     Toggle(bool, u8),
-    Slider(u8),
+    Slider(u8, u8),
 }

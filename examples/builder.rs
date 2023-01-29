@@ -2,7 +2,7 @@ use sgui2::builders::{GuiBuilder, TabBuilder, WidgetData};
 use sgui2::{GuiEvent, WidgetState};
 
 fn widget_dbg(wdg: &mut WidgetState) {
-    if let WidgetState::Slider(ref mut state) = wdg {
+    if let WidgetState::Slider(ref mut state, ..) = wdg {
         if *state > 170 {
             *state = 170;
         }
