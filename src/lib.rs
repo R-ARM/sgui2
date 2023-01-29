@@ -163,7 +163,11 @@ impl Gui {
 
         if self.last_interaction.elapsed() > Theme::idle_timeout() {
             // idle animations
-            self.tab_scroll = self.tab_scroll.wrapping_add(1);
+            let reset;
+            (self.tab_scroll, reset) = self.tab_scroll.overflowing_add(1);
+            if reset {
+                self.last_interaction = Instant::now();
+            }
         }
 
         let (width, height) = self.window_size;

@@ -40,6 +40,6 @@ impl Theme {
         20
     }
     pub fn idle_timeout() -> Duration {
-        Duration::from_secs(4)
+        Duration::from_secs(2)
     }
 }
