@@ -8,7 +8,7 @@ use sdl2::{
     },
     video::WindowContext,
 };
-use std::{mem, time::Instant};
+use std::{cell::Cell, mem, time::Instant};
 
 pub struct GuiBuilder {
     name: String,
@@ -71,7 +71,6 @@ impl GuiBuilder {
             tabs: built_tabs,
             current_tab: 0,
             current_widget: 0,
-            tab_offset_y: 0,
             font_height: font.height(),
             event_pump: sdl.event_pump().unwrap(),
             window_size: (1280, 800),
@@ -121,26 +120,26 @@ impl TabBuilder {
 
 pub struct WidgetData {
     name: String,
-    callback: Option<Box<dyn Fn(&mut WidgetState)>>,
+    callback: Option<Box<dyn Fn(&mut WidgetState, &Cell<Instant>)>>,
     w_type: WidgetState,
 }
 
 impl WidgetData {
-    pub fn btn(name: impl ToString, cb: impl Fn(&mut WidgetState) + 'static) -> Self {
+    pub fn btn(name: impl ToString, cb: impl Fn(&mut WidgetState, &Cell<Instant>) + 'static) -> Self {
         Self {
             name: name.to_string(),
             callback: Some(Box::new(cb)),
             w_type: WidgetState::Button,
         }
     }
-    pub fn toggle(name: impl ToString, cb: impl Fn(&mut WidgetState) + 'static, state: bool) -> Self {
+    pub fn toggle(name: impl ToString, cb: impl Fn(&mut WidgetState, &Cell<Instant>) + 'static, state: bool) -> Self {
         Self {
             name: name.to_string(),
             callback: Some(Box::new(cb)),
             w_type: WidgetState::Toggle(state, if state { 255 } else { 0 }),
         }
     }
-    pub fn slider(name: impl ToString, cb: impl Fn(&mut WidgetState) + 'static, state: u8) -> Self {
+    pub fn slider(name: impl ToString, cb: impl Fn(&mut WidgetState, &Cell<Instant>) + 'static, state: u8) -> Self {
         Self {
             name: name.to_string(),
             callback: Some(Box::new(cb)),
@@ -151,6 +150,8 @@ impl WidgetData {
         Widget {
             text: draw_text(&self.name, font, texture_creator),
             callback: self.callback,
+            // make sure that function used by users is kickstarted
+            next_callback: Cell::new(Instant::now()),
             state: self.w_type,
         }
     }

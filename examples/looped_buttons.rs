@@ -1,7 +1,9 @@
 use sgui2::builders::{GuiBuilder, TabBuilder, WidgetData};
 use sgui2::{GuiEvent, WidgetState};
+use std::cell::Cell;
+use std::time::Instant;
 
-fn widget_dbg(wdg: &mut WidgetState) {
+fn widget_dbg(wdg: &mut WidgetState, _: &Cell<Instant>) {
     println!("{:#?}", wdg);
 }
 

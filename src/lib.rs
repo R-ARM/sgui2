@@ -16,7 +16,9 @@ use sdl2::{
 use num::integer::div_ceil;
 use std::time::{
     Instant,
+    Duration,
 };
+use std::cell::Cell;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GuiEvent {
@@ -33,7 +35,6 @@ pub struct Gui {
     tabs: Vec<Option<Tab>>,
     current_tab: usize,
     current_widget: usize,
-    tab_offset_y: usize,
     font_height: i32,
     window_size: (u32, u32),
     focus: Focus,
@@ -348,7 +349,8 @@ pub struct Widget {
     text: Texture,
     state: WidgetState,
     #[derivative(Debug="ignore")]
-    callback: Option<Box<dyn Fn(&mut WidgetState)>>,
+    callback: Option<Box<dyn Fn(&mut WidgetState, &Cell<Instant>)>>,
+    next_callback: Cell<Instant>,
 }
 
 impl Widget {
@@ -399,6 +401,17 @@ impl Widget {
             },
             WidgetState::Button => (),
         }
+        let use_timer = match self.state {
+            WidgetState::Button => false,
+            WidgetState::Slider(..) => true,
+            WidgetState::Toggle(..) => true,
+        };
+        if use_timer && Instant::now() > self.next_callback.get() {
+            if let Some(cb) = &self.callback {
+                self.next_callback.set(Instant::now() + Duration::from_secs(0xFFFFFFFFF));
+                cb(&mut self.state, &self.next_callback);
+            }
+        }
     }
     fn grabs_input(&self) -> bool {
         match self.state {
@@ -436,7 +449,7 @@ impl Widget {
         }
         if fire_callback {
             if let Some(cb) = &self.callback {
-                cb(&mut self.state);
+                cb(&mut self.state, &self.next_callback);
             }
         }
     }
