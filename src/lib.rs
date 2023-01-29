@@ -269,13 +269,13 @@ impl Gui {
             self.canvas.fill_rect(right).expect("Failed to clear right side");
             self.canvas.set_viewport(right);
             let offset = if let Some(left) = left_panel { left.width() as i32 } else { 0 };
-            let curtab = self.tabs.get(self.current_tab).unwrap().as_ref()
+            let curtab = self.tabs.get_mut(self.current_tab).unwrap().as_mut()
                 .expect("current_tab should always be a valid index for a tab");
 
             let mut y_pos = 0;
             let pad = (Theme::padding() as i32 * self.font_height)  / 100;
             self.canvas.set_draw_color(Theme::fg_widgets());
-            for (i, widget) in curtab.widgets.iter().enumerate() {
+            for (i, widget) in curtab.widgets.iter_mut().enumerate() {
                 y_pos += pad as i32;
 
                 let old_viewport = self.canvas.viewport();
@@ -356,7 +356,7 @@ impl Widget {
         let query = self.text.query();
         query.height
     }
-    fn draw(&self, canvas: &mut render::Canvas<video::Window>) {
+    fn draw(&mut self, canvas: &mut render::Canvas<video::Window>) {
         let query = self.text.query();
         let text_rect = Rect::new(0, 0, query.width, query.height);
         canvas.copy(&self.text, None, text_rect).expect("Failed to draw a widget");
@@ -365,13 +365,18 @@ impl Widget {
         let margin = bounds.height()/4;
         let box_size = bounds.height() - margin*2;
         match self.state {
-            WidgetState::Toggle(state) => {
+            WidgetState::Toggle(state, ref mut opacity) => {
                 let textbox_rect = Rect::new((bounds.width() - (margin*2 + box_size)) as i32, margin as i32, box_size, box_size);
                 if state {
-                    canvas.fill_rect(textbox_rect).expect("Failed to draw toggle widget");
+                    *opacity = opacity.saturating_add(div_ceil(255 - *opacity, 4));
                 } else {
-                    canvas.draw_rect(textbox_rect).expect("Failed to draw toggle widget");
+                    *opacity = opacity.saturating_sub(div_ceil(*opacity, 4));
                 }
+                let old = canvas.draw_color();
+                canvas.set_draw_color((old.r, old.g, old.b, *opacity));
+                canvas.fill_rect(textbox_rect).expect("Failed to draw toggle widget");
+                canvas.set_draw_color((old.r, old.g, old.b));
+                canvas.draw_rect(textbox_rect).expect("Failed to draw toggle widget");
             },
             WidgetState::Slider(state) => {
                 // try not overlapping text
@@ -394,7 +399,7 @@ impl Widget {
     }
     fn grabs_input(&self) -> bool {
         match self.state {
-            WidgetState::Button | WidgetState::Toggle(_) => false,
+            WidgetState::Button | WidgetState::Toggle(..) => false,
             WidgetState::Slider(_) => true,
         }
     }
@@ -406,7 +411,7 @@ impl Widget {
                     fire_callback = true;
                 }
             }
-            WidgetState::Toggle(ref mut state) => {
+            WidgetState::Toggle(ref mut state, _) => {
                 if *code == ActionKey::Press {
                     *state = !*state;
                     fire_callback = true;
@@ -441,6 +446,6 @@ impl Widget {
 #[derive(Debug)]
 pub enum WidgetState {
     Button,
-    Toggle(bool),
+    Toggle(bool, u8),
     Slider(u8),
 }

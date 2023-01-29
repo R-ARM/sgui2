@@ -4,6 +4,7 @@ use sdl2::{
     render::{
         Texture,
         TextureCreator,
+        BlendMode,
     },
     video::WindowContext,
 };
@@ -39,10 +40,11 @@ impl GuiBuilder {
             .allow_highdpi()
             .resizable()
             .build().expect("Failed to create a window");
-        let canvas = window.into_canvas()
+        let mut canvas = window.into_canvas()
             .present_vsync()
             .build()
             .expect("Failed to create SDL canvas");
+        canvas.set_blend_mode(BlendMode::Blend);
         let texture_creator = canvas.texture_creator();
 
         // get font size
@@ -135,7 +137,7 @@ impl WidgetData {
         Self {
             name: name.to_string(),
             callback: Some(Box::new(cb)),
-            w_type: WidgetState::Toggle(state),
+            w_type: WidgetState::Toggle(state, if state { 255 } else { 0 }),
         }
     }
     pub fn slider(name: impl ToString, cb: impl Fn(&mut WidgetState) + 'static, state: u8) -> Self {
