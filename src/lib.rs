@@ -41,6 +41,8 @@ pub struct Gui {
     last_interaction: Instant,
     tab_scroll: u8,
     selection: SelectionWindow,
+    want_widget_scroll: i32,
+    widget_scroll: i32,
 }
 
 #[derive(Debug)]
@@ -53,6 +55,9 @@ struct SelectionWindow {
 impl SelectionWindow {
     fn move_to(&mut self, location: Rect) {
         self.desired = location;
+    }
+    fn rect(&self) -> &Rect {
+        &self.rect
     }
     fn draw(&self, canvas: &mut render::Canvas<video::Window>) {
         canvas.set_draw_color(self.colors);
@@ -109,7 +114,7 @@ impl Gui {
                 },
                 Event::KeyDown{keycode, repeat, ..} => {
                     if repeat {
-                        continue;
+                        //continue;
                     }
                     if let Some(code) = keycode {
                         match code {
@@ -215,14 +220,17 @@ impl Gui {
         let left_panel;
         let right_panel;
         if one_panel {
+            let mut old_viewport = self.canvas.viewport();
             match self.focus {
                 Focus::TabBar => {
-                    left_panel = Some(self.canvas.viewport());
+                    old_viewport.set_y(0);
+                    left_panel = Some(old_viewport);
                     right_panel = None;
                 },
                 Focus::Widgets | Focus::WidgetSingle => {
+                    old_viewport.set_y(self.widget_scroll);
                     left_panel = None;
-                    right_panel = Some(self.canvas.viewport());
+                    right_panel = Some(old_viewport);
                 }
             }
         } else {
@@ -231,7 +239,7 @@ impl Gui {
             let r_width = width - sep;
             let l_width = width - r_width;
             left_panel = Some(Rect::new(0, 0, l_width, height));
-            right_panel = Some(Rect::new(sep as i32, 0, r_width, height));
+            right_panel = Some(Rect::new(sep as i32, self.widget_scroll, r_width, height));
         }
 
         if let Some(left) = left_panel {
@@ -273,7 +281,7 @@ impl Gui {
             let curtab = self.tabs.get_mut(self.current_tab).unwrap().as_mut()
                 .expect("current_tab should always be a valid index for a tab");
 
-            let mut y_pos = 0;
+            let mut y_pos = right.y();
             let pad = (Theme::padding() as i32 * self.font_height)  / 100;
             self.canvas.set_draw_color(Theme::fg_widgets());
             for (i, widget) in curtab.widgets.iter_mut().enumerate() {
@@ -288,10 +296,15 @@ impl Gui {
 
                 if i == self.current_widget && self.focus != Focus::TabBar {
                     let x = offset;
-                    let y = right.y() + y_pos - pad;
+                    let y = y_pos - pad;
                     let w = right.width() - 1;
                     let h = widget.height() + 2*pad as u32;
                     self.selection.move_to(Rect::new(x, y, w, h));
+                    if (y_pos + widget.height() as i32 + pad) > right.height() as i32 {
+                        self.want_widget_scroll -= (y_pos + widget.height() as i32 + pad) - right.height() as i32;
+                    } else if y < 0 {
+                        self.want_widget_scroll -= y;
+                    }
                 }
 
                 y_pos += widget.height() as i32;
@@ -299,6 +312,9 @@ impl Gui {
             }
             self.canvas.set_draw_color(Theme::bg_widgets());
         }
+
+        self.want_widget_scroll = self.want_widget_scroll.clamp(i32::MIN, 0);
+        self.widget_scroll += div_ceil(self.want_widget_scroll - self.widget_scroll, 4);
 
         self.canvas.set_viewport(None);
         self.selection.tick();

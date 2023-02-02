@@ -78,6 +78,8 @@ impl GuiBuilder {
             last_interaction: Instant::now(),
             tab_scroll: 0,
             selection: SelectionWindow::new((255, 255, 255)),
+            want_widget_scroll: 0,
+            widget_scroll: 0,
         }
     }
 }
