@@ -13,12 +13,26 @@ use sdl2::{
     event::{Event, WindowEvent},
     keyboard::Keycode,
 };
-use num::integer::div_ceil;
 use std::time::{
     Instant,
     Duration,
 };
+use std::ops::{Add, Sub, Div};
+use std::cmp::PartialOrd;
 use std::cell::Cell;
+
+fn closerize<T: Add<Output = T> + Sub<Output = T> + Div<T, Output = T> + PartialOrd<i32> + Copy + From<u8>>(true_value: T, target: T) -> T {
+    let diff = true_value - target;
+    let div;
+    if diff <= 2 && diff >= -2 {
+        div = 1;
+    } else if diff <= 4 && diff >= -4 {
+        div = 2;
+    } else {
+        div = 4;
+    }
+    true_value - (true_value - target).div(div.into())
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GuiEvent {
@@ -56,23 +70,20 @@ impl SelectionWindow {
     fn move_to(&mut self, location: Rect) {
         self.desired = location;
     }
-    fn rect(&self) -> &Rect {
-        &self.rect
-    }
     fn draw(&self, canvas: &mut render::Canvas<video::Window>) {
         canvas.set_draw_color(self.colors);
         canvas.draw_rect(self.rect).unwrap();
     }
     fn tick(&mut self) {
         if self.rect != self.desired {
-            let x = self.rect.x() + div_ceil(self.desired.x() as i32 - self.rect.x() as i32, 4);
-            let y = self.rect.y() + div_ceil(self.desired.y() as i32 - self.rect.y() as i32, 4);
-            let w = self.rect.width() as i32 + div_ceil(self.desired.width() as i32 - self.rect.width() as i32, 4);
-            let h = self.rect.height() as i32 + div_ceil(self.desired.height() as i32 - self.rect.height() as i32, 4);
+            let x = closerize(self.rect.x(), self.desired.x());
+            let y = closerize(self.rect.y(), self.desired.y());
+            let w = closerize(self.rect.width() as i32, self.desired.width() as i32);
+            let h = closerize(self.rect.height() as i32, self.desired.height() as i32);
             self.rect.set_x(x);
             self.rect.set_y(y);
-            self.rect.set_width(w.try_into().unwrap_or(1));
-            self.rect.set_height(h.try_into().unwrap_or(1));
+            self.rect.set_width(w as u32);
+            self.rect.set_height(h as u32);
         }
     }
     fn new(rgb: (u8, u8, u8)) -> Self {
@@ -295,27 +306,28 @@ impl Gui {
                 self.canvas.set_viewport(old_viewport);
 
                 if i == self.current_widget && self.focus != Focus::TabBar {
-                    let x = offset;
-                    let y = y_pos - pad;
-                    let w = right.width() - 1;
-                    let h = widget.height() + 2*pad as u32;
-                    self.selection.move_to(Rect::new(x, y, w, h));
-                    if (y_pos + widget.height() as i32 + pad) > right.height() as i32 {
-                        self.want_widget_scroll -= (y_pos + widget.height() as i32 + pad) - right.height() as i32;
-                    } else if y < 0 {
-                        self.want_widget_scroll -= y;
+                    let selection_rect = Rect::new(offset, y_pos - pad, right.width() - 1, widget.height() + 2*pad as u32);
+
+                    if selection_rect.bottom() > right.height() as i32 {
+                        self.want_widget_scroll -= selection_rect.bottom() - right.height() as i32;
                     }
+                    if selection_rect.top() < 0 {
+                        self.want_widget_scroll -= selection_rect.top();
+                    }
+
+                    self.selection.move_to(selection_rect);
                 }
 
                 y_pos += widget.height() as i32;
                 y_pos += pad as i32;
             }
             self.canvas.set_draw_color(Theme::bg_widgets());
+
+            self.want_widget_scroll = self.want_widget_scroll.clamp(-1 * (y_pos - right.y() - right.height() as i32), 0);
         }
 
-        self.want_widget_scroll = self.want_widget_scroll.clamp(i32::MIN, 0);
-        self.widget_scroll += div_ceil(self.want_widget_scroll - self.widget_scroll, 4);
-
+        self.widget_scroll = closerize(self.widget_scroll, self.want_widget_scroll);
+    
         self.canvas.set_viewport(None);
         self.selection.tick();
         self.selection.draw(&mut self.canvas);
@@ -386,9 +398,9 @@ impl Widget {
             WidgetState::Toggle(state, ref mut opacity) => {
                 let textbox_rect = Rect::new((bounds.width() - (margin*2 + box_size)) as i32, margin as i32, box_size, box_size);
                 if state {
-                    *opacity = opacity.saturating_add(div_ceil(255 - *opacity, 4));
+                    *opacity = closerize(*opacity as i32, 255) as u8;
                 } else {
-                    *opacity = opacity.saturating_sub(div_ceil(*opacity, 4));
+                    *opacity = closerize(*opacity as i32, 0) as u8;
                 }
                 let old = canvas.draw_color();
                 canvas.set_draw_color((old.r, old.g, old.b, *opacity));
@@ -398,7 +410,7 @@ impl Widget {
             },
             WidgetState::Slider(state, ref mut display_state) => {
                 if *display_state != state {
-                    *display_state = (*display_state as i16).saturating_add(div_ceil(state as i16 - *display_state as i16, 4)).try_into().unwrap();
+                    *display_state = closerize(*display_state as i32, state as i32) as u8;
                 }
                 // try not overlapping text
                 let whole_width = if query.width > bounds.width()/2 {
