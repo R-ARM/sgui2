@@ -323,7 +323,9 @@ impl Gui {
             }
             self.canvas.set_draw_color(Theme::bg_widgets());
 
-            self.want_widget_scroll = self.want_widget_scroll.clamp(-1 * (y_pos - right.y() - right.height() as i32), 0);
+            if y_pos > right.height() as i32 {
+                self.want_widget_scroll = self.want_widget_scroll.clamp(-1 * (y_pos - right.y() - right.height() as i32), 0);
+            }
         }
 
         self.widget_scroll = closerize(self.widget_scroll, self.want_widget_scroll);
